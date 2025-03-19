@@ -19,28 +19,19 @@ import os
 import zipfile
 import gdown
 
+import requests
+from PIL import Image
+from io import BytesIO
+
 st.set_page_config(page_title="Multimodal AI Search", layout = "wide")
 
-def download_and_extract_images():
-    zip_path = "images.zip"
-    extract_path = "images"
+import json
 
-    if not os.path.exists(extract_path):
-        st.warning("Downloading image dataset... (this may take a few minutes)")
-
-        # Use gdown to handle Google Drive large file confirmation
-        file_id = "1LD7_tsjoaZBnCcigYVUE1Aj5YD0Wts65"
-        gdown.download(f"https://drive.google.com/uc?id={file_id}", zip_path, quiet=False)
-
-        # Extract it
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_path)
-
-        st.success("✅ Image dataset downloaded and extracted!")
+# Load Drive image links
+with open("image_link_mapping.json", "r") as f:
+    image_link_mapping = json.load(f)
 
 
-# Run it once at start
-download_and_extract_images()
 
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
@@ -76,6 +67,7 @@ def load_image_faiss_index():
     return index, mapping
 
 image_faiss_index, image_mapping = load_image_faiss_index()
+print(image_mapping)
 
 @st.cache_resource
 def load_blip_model():
@@ -88,7 +80,7 @@ def load_blip_model():
 blip_processor, blip_model, blip_device = load_blip_model()
 
 
-
+assert len(mapping["image_filenames"]) == len(mapping["captions"]) == len(mapping["image_urls"])
 
 
 
@@ -158,10 +150,20 @@ if search_mode in ["Text", "Both"]:
             for i, (idx, dist) in enumerate(zip(indices[0], distances[0])):
                 with cols[i % 2]:
                     caption = mapping["captions"][idx]
-                    image_path = mapping["image_filenames"][idx]
+                    #image_path = mapping["image_filenames"][idx]
+                    image_url = mapping["image_urls"][idx]
+
                     similarity = dist * 100
-                    st.image(f"images/{image_path}", width=300, caption=f"Rank #{i+1} ({similarity:.2f}%): {caption}")
-                        
+
+                    #st.text(f"Image URL: {image_url}") #Temporary
+
+                    response = requests.get(image_url)
+                    image = Image.open(BytesIO(response.content))
+                    #st.image(image, width=300)
+
+                    #st.image(f"images/{image_path}", width=300, caption=f"Rank #{i+1} ({similarity:.2f}%): {caption}")
+                    st.image(image, width=300, caption=f"Rank #{i+1} ({similarity:.2f}%): {caption}")
+
             st.session_state["search_history"].append(f"Text: {query}")
 
 
@@ -204,9 +206,16 @@ if search_mode in ["Image", "Both"]:
 
         st.markdown("### Top Visually Similar Images:")
         for rank, (idx, dist) in enumerate(zip(indices[0], distances[0])):
-            image_path = image_mapping["image_filenames"][idx]
+            #image_path = image_mapping["image_filenames"][idx]
+            image_url = image_mapping["image_urls"][idx]
+
             similarity = dist * 100
-            st.image(f"images/{image_path}", width=300, caption=f"Rank #{rank+1} (Similarity: {similarity:.2f}%)")
+
+            response = requests.get(image_url)
+            image = Image.open(BytesIO(response.content))
+
+            #st.image(image_url, width=300, caption=f"Rank #{rank+1} ({similarity:.2f}%): {caption}")
+            st.image(image, width=300, caption=f"Rank #{rank+1} ({similarity:.2f}%)")
         
         st.session_state["search_history"].append(f"Image uploaded search – {generated_caption}")
 

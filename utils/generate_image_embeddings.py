@@ -7,6 +7,7 @@ from PIL import Image
 import numpy as np
 import pickle
 from sklearn.preprocessing import normalize
+from tqdm import tqdm
 
 # Step 1: Load CLIP model
 model, _, preprocess = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
@@ -21,7 +22,7 @@ image_files = [f for f in os.listdir(image_folder) if f.lower().endswith((".jpg"
 embeddings = []
 valid_filenames = []
 
-for img_name in image_files:
+for img_name in tqdm(image_files, desc="Generating image embeddings"):
     img_path = os.path.join(image_folder, img_name)
     try:
         image = Image.open(img_path).convert("RGB")
