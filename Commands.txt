@@ -1,0 +1,23 @@
+
+# ✅ Main Terminal Commands – Multimodal AI Search Engine
+
+# --- Virtual Environment ---
+python3 -m venv .venv                 # Create virtual environment
+source .venv/bin/activate            # Activate virtual environment
+deactivate                           # Exit virtual environment
+
+# --- Install Requirements ---
+pip install torch torchvision faiss-cpu streamlit open-clip-torch
+pip freeze > requirements.txt       # Save dependencies
+
+# --- Run Embedding Generator ---
+python3 utils/generate_clip_embeddings.py
+
+# --- Build FAISS Index ---
+python3 utils/build_faiss_index.py
+
+# --- Run Streamlit UI ---
+streamlit run app/frontend/search_app.py
+
+# --- Optional Cleanups ---
+rm -r .venv                         # Delete virtual environment

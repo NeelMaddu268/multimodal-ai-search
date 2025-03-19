@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pkl
+*.pkl.gz
+.DS_Store
+/images/
+/embeddings/
+/captions/formatted_coco_captions.txt
