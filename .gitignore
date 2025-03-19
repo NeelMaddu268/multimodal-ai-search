@@ -4,3 +4,4 @@ __pycache__/
 /images/
 /captions/formatted_coco_captions.txt
 credentials.json
+embeddings/umap_model.pkl
