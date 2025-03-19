@@ -19,6 +19,8 @@ import os
 import zipfile
 import gdown
 
+st.set_page_config(page_title="Multimodal AI Search", layout = "wide")
+
 def download_and_extract_images():
     zip_path = "images.zip"
     extract_path = "images"
@@ -39,9 +41,6 @@ def download_and_extract_images():
 
 # Run it once at start
 download_and_extract_images()
-
-
-st.set_page_config(page_title="Multimodal AI Search", layout = "wide")
 
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
