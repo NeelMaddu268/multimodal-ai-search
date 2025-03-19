@@ -4,5 +4,5 @@ __pycache__/
 *.pkl.gz
 .DS_Store
 /images/
-/embeddings/
 /captions/formatted_coco_captions.txt
+credentials.json
