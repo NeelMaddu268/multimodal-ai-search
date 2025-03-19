@@ -15,27 +15,27 @@ import os
 import zipfile
 import requests
 
+import os
+import zipfile
+import gdown
+
 def download_and_extract_images():
     zip_path = "images.zip"
     extract_path = "images"
-    
+
     if not os.path.exists(extract_path):
         st.warning("Downloading image dataset... (this may take a few minutes)")
-        
-        # Replace this with YOUR actual file ID
+
+        # Use gdown to handle Google Drive large file confirmation
         file_id = "1LD7_tsjoaZBnCcigYVUE1Aj5YD0Wts65"
-        gdrive_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        
-        # Download the zip file
-        response = requests.get(gdrive_url)
-        with open(zip_path, "wb") as f:
-            f.write(response.content)
-        
+        gdown.download(f"https://drive.google.com/uc?id={file_id}", zip_path, quiet=False)
+
         # Extract it
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_path)
-        
-        st.success("Image dataset downloaded and extracted!")
+
+        st.success("✅ Image dataset downloaded and extracted!")
+
 
 # Run it once at start
 download_and_extract_images()
