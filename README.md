@@ -1,3 +1,14 @@
+---
+title: Multimodal AI Search
+emoji: 🔍
+colorFrom: blue
+colorTo: purple
+sdk: streamlit
+sdk_version: 1.31.0
+app_file: app/frontend/Home.py
+pinned: false
+---
+
 # Multimodal AI Search Engine
 
 ## Overview
