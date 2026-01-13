@@ -15,6 +15,7 @@ import os
 import requests
 from io import BytesIO
 import json
+import gc
 
 st.set_page_config(page_title="Multimodal AI Search", layout = "wide")
 
