@@ -12,7 +12,8 @@ import joblib
 # Try to load UMAP model (might be missing in cloud deployment due to size)
 try:
     umap_model = joblib.load("embeddings/umap_model.pkl")
-except FileNotFoundError:
+except Exception as e:
+    print(f"Failed to load UMAP model: {e}")
     umap_model = None
 
 with open("embeddings/embedding_projection_2d.pkl", "rb") as f:
