@@ -92,9 +92,22 @@ def load_blip_model():
     if torch.backends.mps.is_available():
         device = "mps"
     model = model.to(device)
+    model = model.to(device)
+    model = model.to(device)
+    
+    # OPTIMIZATION: Quantize BLIP to int8 to save RAM (Crucial for Streamlit Cloud 1GB limit)
+    # Only quantize if on CPU (MPS/CUDA don't always support qint8 dynamic well, but Cloud is CPU)
+    if device == "cpu":
+        try:
+            model = torch.quantization.quantize_dynamic(
+                model, {torch.nn.Linear}, dtype=torch.qint8
+            )
+        except Exception as e:
+            pass # Fallback to full precision if quantization fails
+
     return processor, model, device
 
-blip_processor, blip_model, blip_device = load_blip_model()
+# blip_processor, blip_model, blip_device = load_blip_model()  <-- MOVED to lazy load
 
 # Page Setup
 st.title("Multimodal AI Search Engine")
@@ -173,6 +186,9 @@ if search_mode in ["Image", "Both"]:
         st.image(image, caption="Uploaded Image", use_container_width=True)
 
         # --- BLIP Caption Generation ---
+        # Lazy load BLIP to save memory on startup
+        blip_processor, blip_model, blip_device = load_blip_model()
+
         blip_image = Image.open(uploaded_image).convert("RGB")
         inputs = blip_processor(blip_image, return_tensors="pt").to(blip_device)
 
