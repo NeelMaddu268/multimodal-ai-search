@@ -2,8 +2,9 @@
 
 import pickle
 
+import gzip
 # Load caption embeddings
-with open("embeddings/text_embeddings.pkl", "rb") as f:
+with gzip.open("embeddings/text_embeddings.pkl.gz", "rb") as f:
     caption_data = pickle.load(f)
 
 # Load image embeddings

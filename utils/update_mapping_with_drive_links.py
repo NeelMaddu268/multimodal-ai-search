@@ -22,4 +22,4 @@ mapping["image_urls"] = image_urls
 with open("embeddings/index_mapping.pkl", "wb") as f:
     pickle.dump(mapping, f)
 
-print("✅ Updated mapping file with Google Drive image URLs.")
+print("Updated mapping file with Google Drive image URLs.")

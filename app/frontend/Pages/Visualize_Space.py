@@ -1,4 +1,6 @@
-# app/frontend/visualize_space.py
+import os
+# Fix OMP: Info #276 warning
+os.environ["OMP_NUM_THREADS"] = "1"
 
 import streamlit as st
 import pickle
@@ -6,10 +8,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
 import pandas as pd
-
 import joblib
-umap_model = joblib.load("embeddings/umap_model.pkl")
+import open_clip
+import torch
+from sklearn.preprocessing import normalize
 
+# Try to load UMAP model
+try:
+    umap_model = joblib.load("embeddings/umap_model.pkl")
+except FileNotFoundError:
+    umap_model = None
 
 with open("embeddings/embedding_projection_2d.pkl", "rb") as f:
     data = pickle.load(f)
@@ -26,44 +34,52 @@ df = pd.DataFrame({
     "meta": metadata
 })
 
-
 st.set_page_config(page_title="Embedding Space", layout="wide")
 st.title("Visualizing CLIP Embedding Space (UMAP)")
 
 st.markdown("### Optional: Add a Text Query Vector to the Plot")
 
-query_text = st.text_input("Enter a query caption (optional):")
-
-import open_clip
-import torch
-from sklearn.preprocessing import normalize
-
-if query_text.strip():
-    # Load CLIP model + tokenizer
+# Cache the model loading to prevent freezing on every keystroke
+@st.cache_resource
+def load_clip_model():
     model, _, preprocess = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
     tokenizer = open_clip.get_tokenizer("ViT-B-32")
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    if torch.backends.mps.is_available():
+        device = "mps"
     model = model.to(device)
+    return model, tokenizer, device
 
-    # Encode query caption
-    tokenized = tokenizer([query_text]).to(device)
-    with torch.no_grad():
-        query_embedding = model.encode_text(tokenized)
-    query_embedding = normalize(query_embedding.cpu().numpy(), axis=1)
+if umap_model is None:
+    st.info("ℹ️ Dynamic query projection is disabled because the UMAP model file (250MB) is too large for GitHub.")
+else:
+    # Use a form to prevent reload on every character type
+    with st.form("query_form"):
+        query_text = st.text_input("Enter a query caption (optional):")
+        submitted = st.form_submit_button("Project Query")
 
-    # Project into UMAP space
-    query_2d = umap_model.transform(query_embedding)
+    if submitted and query_text.strip():
+        model, tokenizer, device = load_clip_model()
 
-    # Add query point to df
-    df = pd.concat([
-        df,
-        pd.DataFrame({
-            "x": [query_2d[0][0]],
-            "y": [query_2d[0][1]],
-            "label": ["query"],
-            "meta": [f"🟢 {query_text}"]
-        })
-    ], ignore_index=True)
+        # Encode query caption
+        tokenized = tokenizer([query_text]).to(device)
+        with torch.no_grad():
+            query_embedding = model.encode_text(tokenized)
+        query_embedding = normalize(query_embedding.cpu().numpy(), axis=1)
+
+        # Project into UMAP space
+        query_2d = umap_model.transform(query_embedding)
+
+        # Add query point to df
+        df = pd.concat([
+            df,
+            pd.DataFrame({
+                "x": [query_2d[0][0]],
+                "y": [query_2d[0][1]],
+                "label": ["query"],
+                "meta": [f"Query: {query_text}"]
+            })
+        ], ignore_index=True)
 
 
 # Split data by type

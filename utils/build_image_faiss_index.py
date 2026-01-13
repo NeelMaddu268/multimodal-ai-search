@@ -33,4 +33,4 @@ mapping = {
 with open("embeddings/image_index_mapping.pkl", "wb") as f:
     pickle.dump(mapping, f)
 
-print("✅ Image FAISS index and mapping with image URLs saved.")
+print("Image FAISS index and mapping with image URLs saved.")

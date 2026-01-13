@@ -2,13 +2,14 @@ import faiss  # Vector search engine
 import pickle
 import numpy as np
 import json
+import gzip
 
 # Load text embeddings
-with open("embeddings/text_embeddings.pkl", "rb") as f:
+with gzip.open("embeddings/text_embeddings.pkl.gz", "rb") as f:
     data = pickle.load(f)
 
 embeddings = data["embeddings"]
-image_filenames = data["image_filenames"]
+image_filenames = data["caption_image_map"]
 captions = data["captions"]
 
 # Load Drive image links
@@ -36,4 +37,4 @@ mapping = {
 with open("embeddings/index_mapping.pkl", "wb") as f:
     pickle.dump(mapping, f)
 
-print("✅ Text FAISS index and mapping with image URLs saved.")
+print("Text FAISS index and mapping with image URLs saved.")

@@ -1,5 +1,5 @@
 
-# ✅ Main Terminal Commands – Multimodal AI Search Engine
+# Main Terminal Commands – Multimodal AI Search Engine
 
 # --- Virtual Environment ---
 python3 -m venv .venv                 # Create virtual environment

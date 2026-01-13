@@ -1,72 +1,67 @@
 # Multimodal AI Search Engine
 
 ## Overview
-This project is a local AI-powered search engine that allows users to find relevant images or captions by entering a text query. It leverages OpenCLIP for embedding text into a vector space and FAISS for efficient semantic similarity search. By combining these tools, the search engine can provide meaningful results without requiring external APIs, ensuring a fast, fully offline experience.
+This project is a sophisticated AI-powered search engine that allows users to find relevant images or captions using natural language queries. It leverages **OpenCLIP** for state-of-the-art text-to-image and image-to-image semantic matching, and **FAISS** for high-performance vector retrieval.
+
+The architecture is designed to be **Cloud-Ready**: heavyweight models run locally (or on the server) via PyTorch, while image assets are dynamically fetched from the cloud (Google Drive) to keep the deployment lightweight.
 
 ## Features
-- **Text-to-Image Search:** Enter a text query to find matching images and captions.
-- **Semantic Search Backend:** OpenCLIP embeddings and FAISS vector indexing ensure high-quality, meaningful results.
-- **Local Execution:** No internet connection or API keys needed — everything runs on your Mac.
-- **Similarity Scores:** Results include similarity percentages to show how closely each result matches your query.
+- **Text-to-Image Search**: Enter a text query (e.g., "dog jumping in water") to find semantically matching images.
+- **Image-to-Image Search**: Upload an image to find visually similar images from the dataset.
+- **Hybrid Cloud Architecture**: Uses a smart caching system to fetch images from Google Drive URLs, falling back to local files only if necessary.
+- **High-Quality Data**: Implements strict dataset filtering (removing noise, fragments, and truncated captions) to ensure search relevance.
+- **Embedding Visualization**: Visualizes the high-dimensional CLIP embedding space using UMAP 2D projections.
+- **Real-time Captioning**: Uses the BLIP model to generate captions for uploaded images on the fly.
 
-## How It Works
-1. **User Query Input:** A simple Streamlit UI lets users type in a text query.
-2. **CLIP Text Embedding:** The query is tokenized and converted into a high-dimensional vector.
-3. **FAISS Index Search:** The vector is matched against a pre-built index of image-caption embeddings to find the most similar results.
-4. **Results Display:** The top matches are displayed with their associated captions, images, and similarity scores.
-
-## Installation
-1. **Set Up Environment:**
-   ```
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-
-   deactivate
-   ```
-
-2. **Download Dataset:**
-   Place images and captions in the respective `images/` and `captions/` folders. Use a formatted caption file in the form of `filename|caption`.
-
-3. **Generate Embeddings:**
-   Run:
-   ```
-   python3 utils/generate_clip_embeddings.py
-   ```
-
-4. **Build FAISS Index:**
-   ```
-   python3 utils/build_faiss_index.py
-   ```
-
-5. **Run the UI:**
-   ```
-   streamlit run app/frontend/search_app.py
-   ```
+## PyTorch Architecture
+This project demonstrates robust Deep Learning engineering patterns:
+- **Custom Datasets**: Implements `TextDataset` and `ImageDataset` inheriting from `torch.utils.data.Dataset` for modular data loading.
+- **Efficient Batching**: Uses `torch.utils.data.DataLoader` for optimized batch processing during embedding generation.
+- **Device Agnostic**: Automatically selects CUDA (NVIDIA), MPS (Apple Silicon), or CPU based on hardware availability.
 
 ## Project Structure
 ```
 multimodal-search/
-├── images/                   # Images dataset
+├── images/                   # Local images (optional, used as fallback)
 ├── captions/                 # Captions dataset
-├── embeddings/               # Precomputed embeddings and FAISS index
+├── embeddings/               # Precomputed FAISS indices and pickles
 ├── app/
-│   ├── backend/              # Backend logic (future expansions)
-│   └── frontend/             # Streamlit UI
-├── utils/                    # Utility scripts
-└── models/                   # Pretrained model files (if needed)
+│   └── frontend/
+│       ├── Home.py                  # Main Streamlit Application
+│       └── pages/Visualize_Space.py # Embedding Space Visualization
+├── utils/                    # Data processing and embedding scripts
+└── image_link_mapping.json   # Maps filenames to Google Drive URLs
 ```
 
-## Usage
-1. Open the UI by running the Streamlit app.
-2. Enter a text query in the search box.
-3. View ranked results with captions, images, and similarity scores.
+## Installation
+1. **Set Up Environment**:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
 
-## Next Steps
-- **Add Image-to-Text Search:** Enable users to upload an image and retrieve relevant captions.
-- **Improve Similarity Scoring:** Experiment with cosine similarity or other metrics.
-- **Advanced Features:** Incorporate filtering, result explanations, and additional datasets.
+2. **Generate Embeddings (Offline Phase)**:
+   This processes your captions/images and saves the vectors to `embeddings/`.
+   ```bash
+   python3 utils/generate_clip_embeddings.py
+   python3 utils/generate_image_embeddings.py
+   ```
+
+3. **Build Indices**:
+   Constructs the FAISS index for fast retrieval.
+   ```bash
+   python3 utils/build_faiss_index.py
+   python3 utils/build_image_faiss_index.py
+   ```
+
+4. **Run the Application**:
+   ```bash
+   streamlit run app/frontend/Home.py
+   ```
+
+## Visualization
+Navigate to the **Visualize Space** page in the sidebar to interact with a 2D UMAP projection of the semantic space. You can map your own queries to see where they land relative to "image" and "caption" clusters.
 
 ---
-
-Developed with OpenCLIP, FAISS, and Streamlit. Fully local, fast, and free to use on your Mac.
+Developed with OpenCLIP, FAISS, PyTorch, and Streamlit.

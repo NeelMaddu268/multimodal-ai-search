@@ -36,4 +36,4 @@ while True:
 with open('image_link_mapping.json', 'w') as f:
     json.dump(image_links, f, indent=2)
 
-print(f"✅ {len(image_links)} image links generated and saved to image_link_mapping.json")
+print(f"{len(image_links)} image links generated and saved to image_link_mapping.json")
