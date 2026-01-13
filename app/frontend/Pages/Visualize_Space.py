@@ -1,6 +1,4 @@
-import os
-# Fix OMP: Info #276 warning
-os.environ["OMP_NUM_THREADS"] = "1"
+# app/frontend/visualize_space.py
 
 import streamlit as st
 import pickle
@@ -8,12 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
 import pandas as pd
-import joblib
-import open_clip
-import torch
-from sklearn.preprocessing import normalize
 
-# Try to load UMAP model
+import joblib
+
+# Try to load UMAP model (might be missing in cloud deployment due to size)
 try:
     umap_model = joblib.load("embeddings/umap_model.pkl")
 except FileNotFoundError:
@@ -34,32 +30,29 @@ df = pd.DataFrame({
     "meta": metadata
 })
 
+
 st.set_page_config(page_title="Embedding Space", layout="wide")
 st.title("Visualizing CLIP Embedding Space (UMAP)")
 
 st.markdown("### Optional: Add a Text Query Vector to the Plot")
 
-# Cache the model loading to prevent freezing on every keystroke
-@st.cache_resource
-def load_clip_model():
-    model, _, preprocess = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
-    tokenizer = open_clip.get_tokenizer("ViT-B-32")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if torch.backends.mps.is_available():
-        device = "mps"
-    model = model.to(device)
-    return model, tokenizer, device
-
 if umap_model is None:
-    st.info("ℹ️ Dynamic query projection is disabled because the UMAP model file (250MB) is too large for GitHub.")
+    st.info("ℹ️ Dynamic query projection is disabled because the UMAP model file (250MB) is too large for GitHub. The static visualization below still works!")
 else:
-    # Use a form to prevent reload on every character type
-    with st.form("query_form"):
-        query_text = st.text_input("Enter a query caption (optional):")
-        submitted = st.form_submit_button("Project Query")
+    query_text = st.text_input("Enter a query caption (optional):")
 
-    if submitted and query_text.strip():
-        model, tokenizer, device = load_clip_model()
+    import open_clip
+    import torch
+    from sklearn.preprocessing import normalize
+
+    if query_text.strip():
+        # Load CLIP model + tokenizer
+        model, _, preprocess = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
+        tokenizer = open_clip.get_tokenizer("ViT-B-32")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.backends.mps.is_available():
+            device = "mps"
+        model = model.to(device)
 
         # Encode query caption
         tokenized = tokenizer([query_text]).to(device)
