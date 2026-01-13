@@ -173,26 +173,23 @@ if search_mode in ["Image", "Both"]:
         image = Image.open(uploaded_image).convert("RGB")
         st.image(image, caption="Uploaded Image", width=300)
 
-        # --- BLIP Caption Generation ---
-        # 1. Load BLIP (Spikes RAM)
-        blip_processor, blip_model, blip_device = load_blip_model()
-
-        blip_image = Image.open(uploaded_image).convert("RGB")
-        inputs = blip_processor(blip_image, return_tensors="pt").to(blip_device)
-
-        with torch.no_grad():
-            out = blip_model.generate(**inputs)
-
-        generated_caption = blip_processor.decode(out[0], skip_special_tokens=True)
+        # --- BLIP Caption Generation (Disabled for Cloud Memory Limits) ---
+        # BLIP requires ~900MB RAM, which combined with CLIP (~600MB) exceeds Streamlit Cloud's 1GB limit.
+        # We disabled it to ensure the Core Search functionality works.
         
-        # 2. Unload BLIP explicitly to free RAM for CLIP
-        del blip_model
-        del blip_processor
-        gc.collect()
+        # blip_processor, blip_model, blip_device = load_blip_model()
+        # blip_image = Image.open(uploaded_image).convert("RGB")
+        # inputs = blip_processor(blip_image, return_tensors="pt").to(blip_device)
+        # with torch.no_grad():
+        #    out = blip_model.generate(**inputs)
+        # generated_caption = blip_processor.decode(out[0], skip_special_tokens=True)
+        # del blip_model; del blip_processor; gc.collect()
 
+        generated_caption = "Captioning disabled on Cloud (Memory Limit)"
+        
         # Display the caption
         st.markdown("### AI-Generated Caption (BLIP):")
-        st.success(generated_caption)
+        st.info(f"ℹ️ {generated_caption}")
 
         if image_faiss_index is not None:
             image_tensor = preprocess(image).unsqueeze(0).to(device)
