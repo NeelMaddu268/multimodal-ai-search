@@ -2,6 +2,5 @@
 __pycache__/
 .DS_Store
 /images/
-/captions/formatted_coco_captions.txt
+/data/
 credentials.json
-

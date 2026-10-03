@@ -1,222 +1,160 @@
-print("\n\n\n\n\n\n\n\n")
+"""Multimodal AI Search: find Flickr8k photos by describing them, by example image, or both."""
 
-# app/frontend/search_app.py
+import time
 
-import streamlit as st
-import torch
-import open_clip
-import faiss
 import numpy as np
-import pickle
-from transformers import BlipProcessor, BlipForConditionalGeneration
-from PIL import Image
+import streamlit as st
 
-import os
-import requests
-from io import BytesIO
-import json
-import gc
+st.set_page_config(page_title="Multimodal AI Search", page_icon="🔍", layout="wide")
+st.html("""<style>
+  [data-testid="stImage"] img { aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; }
+  .score { color: #888; font-size: 0.75rem; }
+  [data-testid="stButtonGroup"] > div { flex-wrap: wrap; }
+</style>""")
 
-st.set_page_config(page_title="Multimodal AI Search", layout = "wide")
+EXAMPLES = [
+    "dog catching a frisbee",
+    "kids in a fountain",
+    "surfer on a big wave",
+    "rock climbing",
+    "concert at night",
+    "snowy mountain hike",
+]
+COLUMNS = 4
 
-# Load Drive image links
-with open("image_link_mapping.json", "r") as f:
-    image_link_mapping = json.load(f)
+st.title("🔍 Multimodal AI Search")
+with st.spinner("Loading the search model and index…"):
+    # imported here so the page shows something while torch loads on a cold start
+    from resources import describe, embed_text, embed_upload, get_engine
 
-if "search_history" not in st.session_state:
-    st.session_state["search_history"] = []
+    engine = get_engine()
+st.caption(f"Search {len(engine):,} photos by describing them, by showing an example, or both.")
 
-# Load the CLIP model once
-@st.cache_resource
-def load_clip_model():
-    model, _, preprocess = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
-    tokenizer = open_clip.get_tokenizer("ViT-B-32")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if torch.backends.mps.is_available():
-        device = "mps"
-    model = model.to(device)
-    return model, tokenizer, device, preprocess
+state = st.session_state
+state.setdefault("query", "")
+state.setdefault("similar_to", None)
+state.setdefault("history", [])
+state.setdefault("seed", 0)
 
-model, tokenizer, device, preprocess = load_clip_model()
 
-# Helper function for loading images from URL or local path
-def get_image_or_placeholder(image_path, image_url=None, caption=None):
-    # 1. Try loading from URL if available
-    if image_url and image_url.strip():
-        try:
-            response = requests.get(image_url, timeout=5) # Add timeout to prevent hanging
-            response.raise_for_status()
-            img = Image.open(BytesIO(response.content)).convert("RGB")
-            return img
-        except Exception as e:
-            pass # Fall through to local load
+def remember(query):
+    query = query.strip()
+    if query:
+        state.history = [query] + [h for h in state.history if h != query][:9]
 
-    # 2. Try loading from local file
-    full_path = os.path.join("images", image_path)
-    try:
-        if not os.path.exists(full_path):
-            raise FileNotFoundError(f"File not found: {full_path}")
-        
-        img = Image.open(full_path).convert("RGB")
-        return img
-    except Exception as e:
-        # 3. Return placeholder
-        placeholder = Image.new('RGB', (300, 300), color=(200, 200, 200))
-        return placeholder
 
-# Load FAISS index and mapping
-@st.cache_resource
-def load_faiss_index():
-    index = faiss.read_index("embeddings/faiss_index.index")
-    with open("embeddings/index_mapping.pkl", "rb") as f:
-        mapping = pickle.load(f)
-    return index, mapping
+def on_query_change():
+    state.similar_to = None
+    state.example = None  # pills act as buttons
+    remember(state.query)
 
-faiss_index, mapping = load_faiss_index()
 
-@st.cache_resource
-def load_image_faiss_index():
-    if not os.path.exists("embeddings/image_faiss.index"):
-        return None, None
-    index = faiss.read_index("embeddings/image_faiss.index")
-    with open("embeddings/image_index_mapping.pkl", "rb") as f:
-        mapping = pickle.load(f)
-    return index, mapping
+def set_query(query):
+    state.query = query
+    on_query_change()
 
-image_faiss_index, image_mapping = load_image_faiss_index()
 
-# Remove cache for BLIP so we can garbage collect it immediately
-def load_blip_model():
-    processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-    model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if torch.backends.mps.is_available():
-        device = "mps"
-    model = model.to(device)
-    
-    # Skip dynamic quantization as it causes OOM during conversion on 1GB instances
-    return processor, model, device
+def show_similar(i):
+    state.similar_to = i
 
-# Page Setup
-st.title("Multimodal AI Search Engine")
 
+def clear_similar():
+    state.similar_to = None
+
+
+# ---------------- sidebar ----------------
 with st.sidebar:
-    st.title("Smart AI Search Engine")
-    st.markdown("""
-Welcome to this multimodal AI search tool.
-
-**Features:**
-- Text → Image search
-- Image → Caption + Similar Images
-- Real-time Caption Generation (BLIP)
-- Semantic Embedding Space Visualization
-    """)
-
-    st.markdown("---")
-    st.markdown("**Search History**")
-
-    for hist in reversed(st.session_state["search_history"][-10:]):
-        st.markdown(f"- {hist}")
-
-st.markdown("### Select Search Mode:")
-search_mode = st.radio("Choose how you'd like to search:", ["Text", "Image", "Both"])
-
-if search_mode == "Both":
-    st.markdown("## Multimodal Search Mode")
-
-if search_mode in ["Text", "Both"]:
-    st.markdown("### Text-Based Search:")
-    query = st.text_input("Search query", placeholder="e.g., a dog playing in the snow")
-
-    if st.button("Search"):
-        if not query.strip():
-            st.warning("Please enter a search query.")
-        else:
-            #Step 1: Tokenize and embed the query
-            tokenized = tokenizer([query]).to(device)
-            with torch.no_grad():
-                query_embedding = model.encode_text(tokenized)
-
-            query_embedding = query_embedding.cpu().numpy().astype("float32")
-            from sklearn.preprocessing import normalize
-            query_embedding = normalize(query_embedding, axis=1)
-
-            # Step 2: Search FAISS index
-            k = 5 # Number of results to show
-            distances, indices = faiss_index.search(query_embedding, k)
-
-            # Step 3: Display results
-            st.markdown("### Search Results (Text Query):")
-
-            cols = st.columns(2)  # two columns side by side
-
-            for i, (idx, dist) in enumerate(zip(indices[0], distances[0])):
-                with cols[i % 2]:
-                    caption = mapping["captions"][idx]
-                    image_filename = mapping["image_filenames"][idx]
-                    image_url = mapping["image_urls"][idx]
-                    
-                    similarity = dist * 100
-                    
-                    image = get_image_or_placeholder(image_filename, image_url)
-                    st.image(image, width=300, caption=f"Rank #{i+1} ({similarity:.2f}%): {caption}")
-
-            st.session_state["search_history"].append(f"Text: {query}")
+    st.header("Settings")
+    k = st.select_slider("Results", options=[8, 12, 16, 24, 32, 48], value=12)
+    mode = st.segmented_control(
+        "Text ranking",
+        ["hybrid", "visual", "captions"],
+        default="hybrid",
+        required=True,
+        format_func=str.capitalize,
+        help="Visual compares your words directly to the pixels. Captions compares them to the five human-written "
+        "descriptions of each photo. Hybrid blends both and scores best on the benchmark in the README.",
+    )
+    if state.history:
+        st.subheader("Recent searches")
+        for h in state.history:
+            st.button(h, key=f"hist-{h}", on_click=set_query, args=(h,), type="tertiary")
+    st.divider()
+    st.caption(f"**Model:** {engine.model_name}  \n**Index:** {len(engine):,} photos, {len(engine.captions):,} captions (Flickr8k)")
+    st.caption("[Source on GitHub](https://github.com/NeelMaddu268/multimodal-ai-search)")
 
 
-if search_mode in ["Image", "Both"]:
+# ---------------- query inputs ----------------
+left, right = st.columns([3, 2], gap="large")
+with left:
+    st.text_input(
+        "Describe a photo",
+        key="query",
+        placeholder="e.g. a dog catching a frisbee at the beach",
+        on_change=on_query_change,
+    )
+    st.pills("Try", EXAMPLES, key="example", on_change=lambda: set_query(state.example or state.query), label_visibility="collapsed")
+with right:
+    upload = st.file_uploader("…and/or start from an image", type=["jpg", "jpeg", "png", "webp"], on_change=clear_similar)
 
-    st.markdown("### Image-Based Search:")
-    uploaded_image = st.file_uploader("Choose an image", type=["jpg","jpeg","png"])
+query = state.query.strip()
+upload_bytes = upload.getvalue() if upload else None
 
-    if uploaded_image is not None:
-        image = Image.open(uploaded_image).convert("RGB")
-        st.image(image, caption="Uploaded Image", width=300)
+if upload_bytes:
+    with right:
+        preview, about = st.columns([1, 2])
+        preview.image(upload_bytes, width="stretch")
+        with about, st.spinner("Captioning…"):
+            st.markdown(f"**BLIP caption:** {describe(upload_bytes)}")
 
-        # --- BLIP Caption Generation ---
-        # 1. Load BLIP (Lazy load, but now safe on HF 16GB RAM)
-        blip_processor, blip_model, blip_device = load_blip_model()
+image_share = 0.5
+if query and upload_bytes:
+    image_share = st.slider("Text ↔ image balance", 0.0, 1.0, 0.5, 0.05, help="0 = only your text matters, 1 = only your image matters")
 
-        blip_image = Image.open(uploaded_image).convert("RGB")
-        inputs = blip_processor(blip_image, return_tensors="pt").to(blip_device)
 
-        with torch.no_grad():
-            out = blip_model.generate(**inputs)
+# ---------------- search ----------------
+def render(results):
+    for row in range(0, len(results), COLUMNS):
+        cols = st.columns(COLUMNS)
+        for j, (col, r) in enumerate(zip(cols, results[row:row + COLUMNS])):
+            with col, st.container(border=True):
+                st.image(engine.thumbnail(r.image), width="stretch")
+                st.markdown(f"<small>{r.caption}</small>", unsafe_allow_html=True)
+                scores = [f"{name} {v:.3f}" for name, v in (("visual", r.visual), ("caption", r.caption_score)) if not np.isnan(v)]
+                if scores:
+                    st.markdown(f'<span class="score">#{row + j + 1} · {" · ".join(scores)}</span>', unsafe_allow_html=True)
+                st.button("More like this", key=f"sim-{r.image}", on_click=show_similar, args=(r.image,), width="stretch")
 
-        generated_caption = blip_processor.decode(out[0], skip_special_tokens=True)
-        
-        # 2. Unload explicitly just to be clean (optional on 16GB but good practice)
-        del blip_model
-        del blip_processor
-        gc.collect()
 
-        # Display the caption
-        st.markdown("### AI-Generated Caption (BLIP):")
-        st.success(generated_caption)
+start = time.perf_counter()
+if state.similar_to is not None:
+    i = state.similar_to
+    results = engine.search(image_vec=engine.image_emb[i], k=k, exclude=i)
+    head, back = st.columns([6, 1], vertical_alignment="center")
+    with head:
+        thumb, text = st.columns([1, 6], vertical_alignment="center")
+        thumb.image(engine.thumbnail(i), width="stretch")
+        text.markdown(f"**Photos that look like this one**  \n<small>{engine.captions[engine.starts[i]]}</small>", unsafe_allow_html=True)
+    back.button("✕ Clear", on_click=clear_similar, width="stretch")
+elif query or upload_bytes:
+    results = engine.search(
+        text_vec=embed_text(query) if query else None,
+        image_vec=embed_upload(upload_bytes) if upload_bytes else None,
+        image_share=image_share,
+        mode=mode,
+        k=k,
+    )
+else:
+    results = None
 
-        if image_faiss_index is not None:
-            image_tensor = preprocess(image).unsqueeze(0).to(device)
-            with torch.no_grad():
-                image_embedding = model.encode_image(image_tensor)
-            image_embedding = image_embedding.cpu().numpy().astype("float32")
+if results is None:
+    head, shuffle = st.columns([6, 1], vertical_alignment="center")
+    head.markdown("**Explore the collection** — or click *More like this* on any photo.")
+    if shuffle.button("Shuffle", width="stretch"):
+        state.seed += 1
+    picks = np.random.default_rng(state.seed).choice(len(engine), size=k, replace=False)
+    results = [engine.result(int(i)) for i in picks]
+else:
+    st.caption(f"{len(results)} results in {(time.perf_counter() - start) * 1000:.0f} ms")
 
-            from sklearn.preprocessing import normalize
-            image_embedding = normalize(image_embedding, axis=1)
-
-            k = 5
-            distances, indices = image_faiss_index.search(image_embedding, k)
-
-            st.markdown("### Top Visually Similar Images:")
-            for rank, (idx, dist) in enumerate(zip(indices[0], distances[0])):
-                image_filename = image_mapping["image_filenames"][idx]
-                image_url = image_mapping["image_urls"][idx]
-
-                similarity = dist * 100
-
-                image = get_image_or_placeholder(image_filename, image_url)
-                st.image(image, width=300, caption=f"Rank #{rank+1} ({similarity:.2f}%)")
-            
-            st.session_state["search_history"].append(f"Image uploaded search – {generated_caption}")
-        else:
-            st.warning("Image search index not found. Run `utils/build_image_faiss_index.py` to generate it.")
-
+render(results)
