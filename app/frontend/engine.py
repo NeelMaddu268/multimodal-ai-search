@@ -39,7 +39,7 @@ def pick_device():
 
 def to_srgb(image):
     """Upright sRGB copy of a PIL image. Honours EXIF rotation (phone uploads) and embedded colour profiles
-    (about 800 Flickr8k photos are Adobe RGB, ProPhoto, etc., and look washed out if read as sRGB)."""
+    (over 1,300 Flickr8k photos carry Adobe RGB, ProPhoto or camera profiles and look off if read as sRGB)."""
     profile = image.info.get("icc_profile")
     image = ImageOps.exif_transpose(image).convert("RGB")
     if profile:

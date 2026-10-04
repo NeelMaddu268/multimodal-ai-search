@@ -1,0 +1,163 @@
+{
+  "queries": [
+    "a dog catching a frisbee",
+    "kids splashing in a fountain",
+    "a surfer riding a big wave",
+    "someone climbing a rock wall",
+    "a crowd at a night concert",
+    "two people hiking on a snowy mountain",
+    "a man in a yellow kayak on rough water",
+    "a little girl in a pink dress",
+    "a brown horse in a field",
+    "a skateboarder doing a trick on a rail",
+    "a football player being tackled",
+    "an old man sitting on a bench",
+    "a bride and groom",
+    "people riding bikes down a dirt trail",
+    "a black and white dog running on the beach",
+    "a baby in a bathtub",
+    "a woman taking a photo",
+    "a motorcycle racing around a corner",
+    "a boy jumping into a swimming pool",
+    "a city street at night",
+    "a cat sleeping on a couch",
+    "a soccer game in the rain",
+    "a man playing guitar on stage",
+    "children in school uniforms",
+    "a red car parked on the street",
+    "a snowboarder in the air",
+    "a dog shaking off water",
+    "a group of friends at a picnic",
+    "a fisherman on a boat",
+    "a person in a costume at a parade"
+  ],
+  "mps": {
+    "device": "mps",
+    "torch_threads": 4,
+    "engine_load_s": 8.2,
+    "photos": 8091,
+    "captions": 40437,
+    "model": "ViT-B-16-SigLIP2 (webli)",
+    "text_query": {
+      "encode": {
+        "n": 30,
+        "p50_ms": 8.3,
+        "p95_ms": 8.9,
+        "mean_ms": 8.3,
+        "max_ms": 8.9
+      },
+      "rank": {
+        "n": 30,
+        "p50_ms": 2.1,
+        "p95_ms": 2.6,
+        "mean_ms": 2.1,
+        "max_ms": 2.6
+      },
+      "total": {
+        "n": 30,
+        "p50_ms": 10.5,
+        "p95_ms": 11.0,
+        "mean_ms": 10.5,
+        "max_ms": 11.1
+      }
+    },
+    "more_like_this": {
+      "n": 10,
+      "p50_ms": 0.4,
+      "p95_ms": 0.4,
+      "mean_ms": 0.4,
+      "max_ms": 0.4
+    },
+    "image_query": {
+      "n": 10,
+      "p50_ms": 25.3,
+      "p95_ms": 25.8,
+      "mean_ms": 25.3,
+      "max_ms": 25.8
+    }
+  },
+  "cpu2": {
+    "device": "cpu",
+    "torch_threads": 2,
+    "engine_load_s": 7.9,
+    "photos": 8091,
+    "captions": 40437,
+    "model": "ViT-B-16-SigLIP2 (webli)",
+    "text_query": {
+      "encode": {
+        "n": 30,
+        "p50_ms": 19.6,
+        "p95_ms": 49.3,
+        "mean_ms": 21.8,
+        "max_ms": 50.9
+      },
+      "rank": {
+        "n": 30,
+        "p50_ms": 2.4,
+        "p95_ms": 4.8,
+        "mean_ms": 2.7,
+        "max_ms": 8.0
+      },
+      "total": {
+        "n": 30,
+        "p50_ms": 21.9,
+        "p95_ms": 53.0,
+        "mean_ms": 24.6,
+        "max_ms": 55.2
+      }
+    },
+    "more_like_this": {
+      "n": 10,
+      "p50_ms": 1.1,
+      "p95_ms": 2.8,
+      "mean_ms": 1.4,
+      "max_ms": 2.8
+    },
+    "image_query": {
+      "n": 10,
+      "p50_ms": 53.6,
+      "p95_ms": 103.3,
+      "mean_ms": 64.9,
+      "max_ms": 103.3
+    },
+    "blip_caption": {
+      "n": 5,
+      "p50_ms": 241.0,
+      "p95_ms": 263.3,
+      "mean_ms": 237.6,
+      "max_ms": 263.3
+    }
+  },
+  "old": {
+    "device": "cpu",
+    "torch_threads": 2,
+    "index_rows": 34184,
+    "photos": 8088,
+    "results_per_query": 5,
+    "text_query": {
+      "encode_and_search": {
+        "n": 30,
+        "p50_ms": 34.9,
+        "p95_ms": 60.7,
+        "mean_ms": 39.8,
+        "max_ms": 87.0
+      },
+      "drive_downloads": {
+        "n": 30,
+        "p50_ms": 5901.8,
+        "p95_ms": 7253.4,
+        "mean_ms": 6045.3,
+        "max_ms": 7366.9
+      },
+      "total": {
+        "n": 30,
+        "p50_ms": 5961.4,
+        "p95_ms": 7285.9,
+        "mean_ms": 6085.1,
+        "max_ms": 7402.2
+      }
+    },
+    "failed_downloads": "0/150",
+    "duplicate_photos_in_top5": "17/150"
+  }
+}

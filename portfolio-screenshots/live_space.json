@@ -1,0 +1,23 @@
+{
+  "what": "Text queries typed into the live Hugging Face Space (cpu-basic: 2 vCPU, 16 GB) from a browser on a home connection, 2026-10-03 ~21:02-21:10 EDT, right after the Space was rebuilt.",
+  "space": "https://huggingface.co/spaces/NM268/Multimodal-ai-search",
+  "cold_start": "First page load after the rebuild showed the search UI about 20 s after the request (includes downloading the model weights and the index from the Hub).",
+  "fields": {
+    "server_reported": "The app's own timer: text encoding + ranking all 8,091 photos, measured on the Space.",
+    "results_visible_ms": "Browser time from pressing Enter until the new top caption is on screen (includes the websocket round trip).",
+    "all_12_thumbnails_loaded_ms": "Browser time from pressing Enter until all 12 thumbnails have finished loading from the Hugging Face CDN."
+  },
+  "note": "'a dog catching a frisbee' reports 6 ms both times because its text embedding was already cached (st.cache_data); only ranking ran. The kayak query below was timed by the server only.",
+  "runs": [
+    {"query": "a man in a yellow kayak on rough water", "server_reported": "12 results in 76 ms", "results_visible_ms": null, "all_12_thumbnails_loaded_ms": null, "top_caption": "The man is in a yellow kayak in rough waters."},
+    {"query": "a dog catching a frisbee", "server_reported": "12 results in 6 ms", "results_visible_ms": 262, "all_12_thumbnails_loaded_ms": 602, "top_caption": "A dog catching a Frisbee."},
+    {"query": "a fisherman standing on a small wooden boat at dawn", "server_reported": "12 results in 76 ms", "results_visible_ms": 341, "all_12_thumbnails_loaded_ms": 707, "top_caption": "A man is docking a boat"},
+    {"query": "three kids jumping on a trampoline in a backyard", "server_reported": "12 results in 76 ms", "results_visible_ms": 327, "all_12_thumbnails_loaded_ms": 589, "top_caption": "Three girls jumping on a trampoline."},
+    {"query": "an old woman knitting by a window", "server_reported": "12 results in 73 ms", "results_visible_ms": 329, "all_12_thumbnails_loaded_ms": 667, "top_caption": "An elderly woman is sitting by a window reading."},
+    {"query": "a dog catching a frisbee", "server_reported": "12 results in 6 ms", "results_visible_ms": 236, "all_12_thumbnails_loaded_ms": 499, "top_caption": "A dog catching a Frisbee."},
+    {"query": "a firefighter spraying water on a burning house", "server_reported": "12 results in 74 ms", "results_visible_ms": 306, "all_12_thumbnails_loaded_ms": 700, "top_caption": "A firefighter responding to a car fire."},
+    {"query": "two boys wrestling in the mud", "server_reported": "12 results in 74 ms", "results_visible_ms": 309, "all_12_thumbnails_loaded_ms": 572, "top_caption": "Two children are playing in deep muddy water."},
+    {"query": "a woman in a red coat walking in the rain", "server_reported": "12 results in 73 ms", "results_visible_ms": 308, "all_12_thumbnails_loaded_ms": 569, "top_caption": "A woman runner in red is getting drenched in the rain."},
+    {"query": "a cyclist racing downhill on a mountain road", "server_reported": "12 results in 75 ms", "results_visible_ms": 327, "all_12_thumbnails_loaded_ms": 564, "top_caption": "A cyclist is riding a bicycle on a curved road up a hill."}
+  ]
+}
