@@ -1,3 +1,6 @@
 -r ../requirements.txt
 umap-learn==0.5.12
 tqdm==4.70.1
+# benchmark_latency.py replays the old app, which used FAISS and fetched images with requests
+faiss-cpu==1.15.1
+requests==2.34.2

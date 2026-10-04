@@ -21,7 +21,7 @@ Search 8,091 Flickr8k photos by describing them ("kids splashing in a fountain")
 ```
                  ┌─────────────── offline: scripts/build_index.py ───────────────┐
  8,091 photos ──►│ SigLIP 2 image encoder ──► image_embeddings.npy   (8,091 × 768)│
-40,455 captions ►│ SigLIP 2 text encoder  ──► caption_embeddings.npy (40,455 × 768)│
+40,437 captions ►│ SigLIP 2 text encoder  ──► caption_embeddings.npy (40,437 × 768)│
                  │ UMAP ──► projection_2d.npy · 400px thumbnails                  │
                  └──────────────────────────────┬─────────────────────────────────┘
                                                 ▼  published to a HF dataset
@@ -30,7 +30,7 @@ Search 8,091 Flickr8k photos by describing them ("kids splashing in a fountain")
  query image ─► image encoder ────► cosine vs. every photo     ─┘
 ```
 
-* **Hybrid ranking.** A text query is scored two ways: against the pixels (cross-modal SigLIP 2) and against the five human-written captions of each photo. Each signal is z-scored across the collection and the two are blended, so neither one's scale dominates. An image query uses visual similarity, and a text + image query blends both with a slider.
+* **Hybrid ranking.** A text query is scored two ways: against the pixels (cross-modal SigLIP 2) and against the human-written captions of each photo (five for almost all of them). Each signal is z-scored across the collection and the two are blended, so neither one's scale dominates. An image query uses visual similarity, and a text + image query blends both with a slider.
 * **Exact search.** At 8k photos, scoring every image is a 768-wide matrix–vector product that takes a few milliseconds in NumPy, so there is no approximate index to tune. For millions of photos you'd swap in an ANN index (FAISS IVF/HNSW) to pull candidates and keep the same blending on top.
 * **Thumbnails go straight from the Hugging Face CDN to your browser**, so the server never downloads images.
 * **More like this** on any result runs an image→image search using the stored embedding.
@@ -38,7 +38,7 @@ Search 8,091 Flickr8k photos by describing them ("kids splashing in a fountain")
 
 ## Benchmark
 
-Every human caption is used as a query and held out of the caption index. A query counts as a hit at K if the photo it describes is in the top K results. The blend weight is tuned on half the queries, and all numbers below are from the other half (20,221 queries over 8,091 photos). Reproduce with `python scripts/eval_retrieval.py data`.
+Every human caption is used as a query and held out of the caption index. A query counts as a hit at K if the photo it describes is in the top K results. The blend weight is tuned on half the queries, and all numbers below are from the other half (20,218 queries over 8,091 photos). Reproduce with `python scripts/eval_retrieval.py data`.
 
 | setup | R@1 | R@5 | R@10 |
 |---|---|---|---|
@@ -46,8 +46,8 @@ Every human caption is used as a query and held out of the caption index. A quer
 | ViT-B-32, query matched against the photos | 38.4% | 62.8% | 72.4% |
 | ViT-B-32, hybrid | 49.9% | 72.9% | 81.0% |
 | MobileCLIP2-S2, hybrid | 53.8% | 77.4% | 84.6% |
-| SigLIP 2 B/16, query matched against the photos | 53.6% | 76.9% | 84.4% |
-| **SigLIP 2 B/16, hybrid (shipped)** | **57.5%** | **79.6%** | **86.7%** |
+| SigLIP 2 B/16, query matched against the photos | 53.6% | 76.8% | 84.4% |
+| **SigLIP 2 B/16, hybrid (shipped)** | **57.5%** | **79.7%** | **86.6%** |
 
 The caption signal gets some help here, because the held-out query is a paraphrase written for the same photo as the captions it's matched against. That's why visual-only numbers are the fairer read on how the model handles queries in your own words. Z-score blending also beat reciprocal-rank fusion by 1 to 3 points R@1 for every model.
 

@@ -18,6 +18,7 @@ import csv
 import json
 import os
 import re
+import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -25,6 +26,9 @@ import open_clip
 import torch
 from PIL import Image
 from tqdm import tqdm
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app", "frontend"))
+from engine import to_srgb  # noqa: E402  same colour handling as query images
 
 THUMB_SIZE = 400
 JUNK_CAPTIONS = {"a", "a group of", "broken image", "i have no idea!"}  # the only non-descriptions in Flickr8k
@@ -43,8 +47,12 @@ def half_precision(device):
 
 
 def clean_caption(text):
-    text = re.sub(r"\s+([.,!?;:])", r"\1", text.strip())  # Flickr8k has "a dog ." style spacing
-    text = re.sub(r"\s+", " ", text)
+    """Undo Flickr8k's tokenised spacing: "a horse 's lead ." -> "A horse's lead.", '" sale "' -> '"sale"'."""
+    text = re.sub(r"\s+", " ", text.strip())
+    text = re.sub(r"\s+([.,!?;:)]|'s\b|'S\b|n't\b)", r"\1", text)
+    text = re.sub(r"\(\s+", "(", text)
+    text = re.sub(r'"\s*([^"]*?)\s*"', r'"\1"', text)
+    text = re.sub(r"(^|\s)'\s+([^']+?)\s+'(?=[\s.,!?]|$)", r"\1'\2'", text)
     return text[:1].upper() + text[1:]
 
 
@@ -73,7 +81,7 @@ def load_captions(path, image_dir):
 def embed_images(model, preprocess, image_dir, filenames, device, batch_size=64):
     def load(name):
         with Image.open(os.path.join(image_dir, name)) as img:
-            return preprocess(img.convert("RGB"))
+            return preprocess(to_srgb(img))
 
     out = []
     with ThreadPoolExecutor(8) as pool:  # PIL decodes outside the GIL; no worker-process startup cost
@@ -98,7 +106,7 @@ def make_thumbnail(src, dst):
     if os.path.exists(dst):
         return
     with Image.open(src) as img:
-        img = img.convert("RGB")
+        img = to_srgb(img)
         img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
         img.save(dst, "JPEG", quality=82, optimize=True, progressive=True)
 
@@ -146,9 +154,12 @@ def main():
         "caption_image": caption_image,
     }
 
+    projection_path = os.path.join(args.out, "projection_2d.npy")
+    if args.no_projection and os.path.exists(projection_path):
+        os.remove(projection_path)  # a stale map would no longer line up with index.json
     if not args.no_projection:
         coords, projected_captions = project_2d(image_emb, caption_emb, caption_image)
-        np.save(os.path.join(args.out, "projection_2d.npy"), coords)
+        np.save(projection_path, coords)
         index["projected_captions"] = projected_captions.tolist()
 
     with open(os.path.join(args.out, "index.json"), "w") as f:

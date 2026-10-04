@@ -1,5 +1,6 @@
 """Search engine shared by the Streamlit pages: loads the model and precomputed embeddings, ranks images."""
 
+import io
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import open_clip
 import torch
+from PIL import ImageCms, ImageOps
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_REPO = "NM268/multimodal-ai-search-data"
@@ -14,6 +16,7 @@ THUMB_URL = f"https://huggingface.co/datasets/{DATA_REPO}/resolve/main/thumbs/"
 
 # Weight on visual similarity vs. caption similarity for text queries, tuned by scripts/eval_retrieval.py.
 VISUAL_WEIGHT = 0.7
+SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
 
 
 def find_data_dir():
@@ -34,6 +37,19 @@ def pick_device():
     return "cpu"
 
 
+def to_srgb(image):
+    """Upright sRGB copy of a PIL image. Honours EXIF rotation (phone uploads) and embedded colour profiles
+    (about 800 Flickr8k photos are Adobe RGB, ProPhoto, etc., and look washed out if read as sRGB)."""
+    profile = image.info.get("icc_profile")
+    image = ImageOps.exif_transpose(image).convert("RGB")
+    if profile:
+        try:
+            image = ImageCms.profileToProfile(image, ImageCms.ImageCmsProfile(io.BytesIO(profile)), SRGB, outputMode="RGB")
+        except (ImageCms.PyCMSError, OSError):
+            pass  # unreadable or non-RGB profile: keep the pixels as they are
+    return image
+
+
 def zscore(x):
     return (x - x.mean()) / (x.std() + 1e-6)
 
@@ -43,12 +59,13 @@ class Result:
     image: int
     filename: str
     caption: str
-    visual: float          # cosine similarity between the query and the photo
-    caption_score: float   # best cosine similarity between a text query and the photo's captions (nan otherwise)
+    visual: float          # cosine similarity between the text query and the photo (nan without text)
+    caption_score: float   # best cosine similarity between the text query and the photo's captions (nan without text)
+    image_score: float     # cosine similarity between the query image and the photo (nan without an image)
 
 
 class SearchEngine:
-    def __init__(self, data_dir=None):
+    def __init__(self, data_dir=None, device=None):
         self.data_dir = Path(data_dir or find_data_dir())
         with open(self.data_dir / "index.json") as f:
             index = json.load(f)
@@ -64,7 +81,7 @@ class SearchEngine:
         projection = self.data_dir / "projection_2d.npy"
         self.projection = np.load(projection) if projection.exists() else None
 
-        self.device = pick_device()
+        self.device = device or pick_device()
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(index["model"], pretrained=index["pretrained"])
         self.model = self.model.to(self.device).eval()
         self.tokenizer = open_clip.get_tokenizer(index["model"])
@@ -80,7 +97,7 @@ class SearchEngine:
 
     @torch.no_grad()
     def encode_image(self, image):
-        emb = self.model.encode_image(self.preprocess(image.convert("RGB")).unsqueeze(0).to(self.device))
+        emb = self.model.encode_image(self.preprocess(to_srgb(image)).unsqueeze(0).to(self.device))
         return torch.nn.functional.normalize(emb.float(), dim=-1)[0].cpu().numpy()
 
     def thumbnail(self, i):
@@ -95,7 +112,7 @@ class SearchEngine:
         Both       -> blended with image_share going to the image query.
         """
         score = np.zeros(len(self.images), dtype=np.float32)
-        text_visual = text_captions = None
+        text_visual = text_captions = image_visual = None
 
         if text_vec is not None:
             text_visual = self.image_emb @ text_vec
@@ -113,14 +130,14 @@ class SearchEngine:
 
         top = np.argpartition(-score, k)[:k]
         top = top[np.argsort(-score[top])]
-        visual = text_visual if text_visual is not None else image_visual
-        return [self.result(i, text_vec, visual[i], text_captions[i] if text_captions is not None else np.nan) for i in top]
+        signals = (text_visual, text_captions, image_visual)
+        return [self.result(i, text_vec, *(np.nan if s is None else s[i] for s in signals)) for i in top]
 
-    def result(self, i, text_vec=None, visual=np.nan, caption_score=np.nan):
+    def result(self, i, text_vec=None, visual=np.nan, caption_score=np.nan, image_score=np.nan):
         """Package image i, labelled with the caption closest to the text query (or its first caption)."""
         lo, hi = self.starts[i], self.starts[i + 1]
         best = lo if text_vec is None else lo + int(np.argmax(self.caption_emb[lo:hi] @ text_vec))
-        return Result(int(i), self.images[i], self.captions[best], float(visual), float(caption_score))
+        return Result(int(i), self.images[i], self.captions[best], float(visual), float(caption_score), float(image_score))
 
     def project(self, text_vec, k=10):
         """Place a text query on the 2-D map: similarity-weighted mean of its nearest projected captions."""

@@ -4,6 +4,7 @@ import time
 
 import numpy as np
 import streamlit as st
+from PIL import UnidentifiedImageError
 
 st.set_page_config(page_title="Multimodal AI Search", page_icon="🔍", layout="wide")
 st.html("""<style>
@@ -25,13 +26,15 @@ COLUMNS = 4
 st.title("🔍 Multimodal AI Search")
 with st.spinner("Loading the search model and index…"):
     # imported here so the page shows something while torch loads on a cold start
-    from resources import describe, embed_text, embed_upload, get_engine
+    from resources import describe, embed_text, embed_upload, get_engine, open_upload
 
     engine = get_engine()
 st.caption(f"Search {len(engine):,} photos by describing them, by showing an example, or both.")
 
 state = st.session_state
-state.setdefault("query", "")
+state.setdefault("saved_query", "")
+if "query" not in state:  # Streamlit drops widget state while another page runs; bring the search back
+    state.query = state.saved_query
 state.setdefault("similar_to", None)
 state.setdefault("history", [])
 state.setdefault("seed", 0)
@@ -44,6 +47,7 @@ def remember(query):
 
 
 def on_query_change():
+    state.saved_query = state.query
     state.similar_to = None
     state.example = None  # pills act as buttons
     remember(state.query)
@@ -72,8 +76,8 @@ with st.sidebar:
         default="hybrid",
         required=True,
         format_func=str.capitalize,
-        help="Visual compares your words directly to the pixels. Captions compares them to the five human-written "
-        "descriptions of each photo. Hybrid blends both and scores best on the benchmark in the README.",
+        help="Visual compares your words directly to the pixels. Captions compares them to the human-written "
+        "descriptions of each photo (usually five). Hybrid blends both and scores best on the benchmark in the README.",
     )
     if state.history:
         st.subheader("Recent searches")
@@ -99,11 +103,17 @@ with right:
 
 query = state.query.strip()
 upload_bytes = upload.getvalue() if upload else None
+if upload_bytes:
+    try:
+        upload_image = open_upload(upload_bytes)
+    except (UnidentifiedImageError, OSError):
+        right.error("Couldn't read that file as an image.")
+        upload_bytes = None
 
 if upload_bytes:
     with right:
         preview, about = st.columns([1, 2])
-        preview.image(upload_bytes, width="stretch")
+        preview.image(upload_image, width="stretch")
         with about, st.spinner("Captioning…"):
             st.markdown(f"**BLIP caption:** {describe(upload_bytes)}")
 
@@ -120,7 +130,8 @@ def render(results):
             with col, st.container(border=True):
                 st.image(engine.thumbnail(r.image), width="stretch")
                 st.markdown(f"<small>{r.caption}</small>", unsafe_allow_html=True)
-                scores = [f"{name} {v:.3f}" for name, v in (("visual", r.visual), ("caption", r.caption_score)) if not np.isnan(v)]
+                signals = (("visual", r.visual), ("caption", r.caption_score), ("image", r.image_score))
+                scores = [f"{name} {v:.3f}" for name, v in signals if not np.isnan(v)]
                 if scores:
                     st.markdown(f'<span class="score">#{row + j + 1} · {" · ".join(scores)}</span>', unsafe_allow_html=True)
                 st.button("More like this", key=f"sim-{r.image}", on_click=show_similar, args=(r.image,), width="stretch")
